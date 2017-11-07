@@ -1,5 +1,3 @@
-<img src="data/logo.jpg" width=25% align="right" />
-
 # Crafting Adversarial Example Attacks on Policy Learners 
 
 
