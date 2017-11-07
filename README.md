@@ -3,7 +3,7 @@
 
 Framework for experimental analysis of adversarial example attacks on policy learning in Deep RL. Attack methodologies are based on our paper "Vulnerability of Deep Reinforcement Learning to Policy Induction Attacks" (Behzadan & Munir, 2017 - https://arxiv.org/abs/1701.04143 ).  
 
-This project provides an interface between OpenAI's RL Baselines and the Cleverhans framework for crafting adversarial examples. We would also like to thank Yen-Chen Lin et al.'s work on `RL-Attack-Detection <https://github.com/yenchenlin/rl-attack-detection>` for inspiring simpler solutions to test-time attacks.
+This project provides an interface between OpenAI's RL Baselines and the Cleverhans framework for crafting adversarial examples. We would also like to thank Yen-Chen Lin et al.'s work on `RL-Attack-Detection` (https://github.com/yenchenlin/rl-attack-detection) for inspiring simpler solutions to test-time attacks.
 
 ### Dependencies
 - Python 3
