@@ -5,7 +5,7 @@ import functools
 import copy
 import os
 import collections
-
+import tensorflow.contrib.layers as layers
 
 # ================================================================
 # Make consistent with numpy
@@ -91,6 +91,9 @@ def categorical_sample_logits(X):
     U = tf.random_uniform(tf.shape(X))
     return argmax(X - tf.log(-tf.log(U)), axis=1)
 
+def sample_noise(shape):
+    noise = tf.random_normal(shape)
+    return noise
 
 # ================================================================
 # Inputs
@@ -224,7 +227,9 @@ def make_session(num_cpu):
     """Returns a session that will use <num_cpu> CPU's only"""
     tf_config = tf.ConfigProto(
         inter_op_parallelism_threads=num_cpu,
-        intra_op_parallelism_threads=num_cpu)
+        intra_op_parallelism_threads=num_cpu,)
+    tf_config.gpu_options.per_process_gpu_memory_fraction=1/10
+    tf_config.gpu_options.allow_growth=True
     return tf.Session(config=tf_config)
 
 
@@ -282,6 +287,37 @@ def save_state(fname):
 # Model components
 # ================================================================
 
+# Added by Andrew Liao
+# for NoisyNet-DQN (using Factorised Gaussian noise)
+# modified from ```dense``` function
+def noisy_dense(x, size, name, bias=True, activation_fn=tf.identity):
+
+    # the function used in eq.7,8
+    def f(x):
+        return tf.multiply(tf.sign(x), tf.pow(tf.abs(x), 0.5))
+    # Initializer of \mu and \sigma 
+    mu_init = tf.random_uniform_initializer(minval=-1*1/np.power(x.get_shape().as_list()[1], 0.5),     
+                                                maxval=1*1/np.power(x.get_shape().as_list()[1], 0.5))
+    sigma_init = tf.constant_initializer(0.4/np.power(x.get_shape().as_list()[1], 0.5))
+    # Sample noise from gaussian
+    p = sample_noise([x.get_shape().as_list()[1], 1])
+    q = sample_noise([1, size])
+    f_p = f(p); f_q = f(q)
+    w_epsilon = f_p*f_q; b_epsilon = tf.squeeze(f_q)
+
+    # w = w_mu + w_sigma*w_epsilon
+    w_mu = tf.get_variable(name + "/w_mu", [x.get_shape()[1], size], initializer=mu_init)
+    w_sigma = tf.get_variable(name + "/w_sigma", [x.get_shape()[1], size], initializer=sigma_init)
+    w = w_mu + tf.multiply(w_sigma, w_epsilon)
+    ret = tf.matmul(x, w)
+    if bias:
+        # b = b_mu + b_sigma*b_epsilon
+        b_mu = tf.get_variable(name + "/b_mu", [size], initializer=mu_init)
+        b_sigma = tf.get_variable(name + "/b_sigma", [size], initializer=sigma_init)
+        b = b_mu + tf.multiply(b_sigma, b_epsilon)
+        return activation_fn(ret + b)
+    else:
+        return activation_fn(ret)
 
 def normc_initializer(std=1.0):
     def _initializer(shape, dtype=None, partition_info=None):  # pylint: disable=W0613
@@ -526,7 +562,7 @@ class Module(object):
     @property
     def variables(self):
         assert self.scope is not None, "need to call module once before getting variables"
-        return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)
+        return tf.get_collection(tf.GraphKeys.VARIABLES, self.scope)
 
 
 def module(name):
@@ -606,10 +642,8 @@ def intprod(x):
     return int(np.prod(x))
 
 
-def flatgrad(loss, var_list, clip_norm=None):
+def flatgrad(loss, var_list):
     grads = tf.gradients(loss, var_list)
-    if clip_norm is not None:
-        grads = [tf.clip_by_norm(grad, clip_norm=clip_norm) for grad in grads]
     return tf.concat(axis=0, values=[
         tf.reshape(grad if grad is not None else tf.zeros_like(v), [numel(v)])
         for (v, grad) in zip(var_list, grads)
@@ -683,7 +717,7 @@ def scope_vars(scope, trainable_only=False):
         list of variables in `scope`.
     """
     return tf.get_collection(
-        tf.GraphKeys.TRAINABLE_VARIABLES if trainable_only else tf.GraphKeys.GLOBAL_VARIABLES,
+        tf.GraphKeys.TRAINABLE_VARIABLES if trainable_only else tf.GraphKeys.VARIABLES,
         scope=scope if isinstance(scope, str) else scope.name
     )
 

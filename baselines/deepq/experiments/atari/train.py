@@ -26,8 +26,8 @@ from baselines.common.schedules import LinearSchedule, PiecewiseSchedule
 # copy over LazyFrames
 from baselines.common.atari_wrappers_deprecated import wrap_dqn
 from baselines.common.azure_utils import Container
-from .model import model, dueling_model
-
+from model import model, dueling_model
+from statistics import statistics
 
 def parse_args():
     parser = argparse.ArgumentParser("DQN experiments for Atari games")
@@ -41,25 +41,22 @@ def parse_args():
     parser.add_argument("--batch-size", type=int, default=32, help="number of transitions to optimize at the same time")
     parser.add_argument("--learning-freq", type=int, default=4, help="number of iterations between every optimization step")
     parser.add_argument("--target-update-freq", type=int, default=40000, help="number of iterations between every target network update")
-    parser.add_argument("--param-noise-update-freq", type=int, default=50, help="number of iterations between every re-scaling of the parameter noise")
-    parser.add_argument("--param-noise-reset-freq", type=int, default=10000, help="maximum number of steps to take per episode before re-perturbing the exploration policy")
     # Bells and whistles
+    boolean_flag(parser, "noisy", default=False, help="whether or not to NoisyNetwork")
     boolean_flag(parser, "double-q", default=True, help="whether or not to use double q learning")
     boolean_flag(parser, "dueling", default=False, help="whether or not to use dueling model")
     boolean_flag(parser, "prioritized", default=False, help="whether or not to use prioritized replay buffer")
-    boolean_flag(parser, "param-noise", default=False, help="whether or not to use parameter space noise for exploration")
-    boolean_flag(parser, "layer-norm", default=False, help="whether or not to use layer norm (should be True if param_noise is used)")
-    boolean_flag(parser, "gym-monitor", default=False, help="whether or not to use a OpenAI Gym monitor (results in slower training due to video recording)")
     parser.add_argument("--prioritized-alpha", type=float, default=0.6, help="alpha parameter for prioritized replay buffer")
     parser.add_argument("--prioritized-beta0", type=float, default=0.4, help="initial value of beta parameters for prioritized replay")
     parser.add_argument("--prioritized-eps", type=float, default=1e-6, help="eps parameter for prioritized replay buffer")
     # Checkpointing
-    parser.add_argument("--save-dir", type=str, default=None, help="directory in which training state and model should be saved.")
+    parser.add_argument("--save-dir", type=str, default=None, required=True, help="directory in which training state and model should be saved.")
     parser.add_argument("--save-azure-container", type=str, default=None,
                         help="It present data will saved/loaded from Azure. Should be in format ACCOUNT_NAME:ACCOUNT_KEY:CONTAINER")
     parser.add_argument("--save-freq", type=int, default=1e6, help="save model once every time this many iterations are completed")
     boolean_flag(parser, "load-on-start", default=True, help="if true and model was previously saved then training will be resumed")
-    #Attacks
+
+    #V: Attack Arguments #
     parser.add_argument("--attack", type=str, default=None, help="Method to attack the model.")
     parser.add_argument("--attack-init", type=int, default=0, help="Iteration no. to begin attacks")
     parser.add_argument("--attack-freq", type=int, default=1, help="Frequency of attacks")
@@ -114,11 +111,8 @@ def maybe_load_model(savedir, container):
 
 if __name__ == '__main__':
     args = parse_args()
-    
     # Parse savedir and azure container.
     savedir = args.save_dir
-    if savedir is None:
-        savedir = os.getenv('OPENAI_LOGDIR', None)
     if args.save_azure_container is not None:
         account_name, account_key, container_name = args.save_azure_container.split(":")
         container = Container(account_name=account_name,
@@ -136,9 +130,7 @@ if __name__ == '__main__':
         set_global_seeds(args.seed)
         env.unwrapped.seed(args.seed)
 
-    if args.gym_monitor and savedir:
-        env = gym.wrappers.Monitor(env, os.path.join(savedir, 'gym_monitor'), force=True)
-
+    # V: Save arguments, configure log dump path to savedir #
     if savedir:
         with open(os.path.join(savedir, 'args.json'), 'w') as f:
             json.dump(vars(args), f)
@@ -146,21 +138,17 @@ if __name__ == '__main__':
 
     with U.make_session(4) as sess:
         # Create training graph and replay buffer
-        def model_wrapper(img_in, num_actions, scope, **kwargs):
-            actual_model = dueling_model if args.dueling else model
-            return actual_model(img_in, num_actions, scope, layer_norm=args.layer_norm, **kwargs)
         act, train, update_target, debug, craft_adv = deepq.build_train(
             make_obs_ph=lambda name: U.Uint8Input(env.observation_space.shape, name=name),
-            q_func=model_wrapper,
+            q_func=dueling_model if args.dueling else model,
             num_actions=env.action_space.n,
             optimizer=tf.train.AdamOptimizer(learning_rate=args.lr, epsilon=1e-4),
             gamma=0.99,
             grad_norm_clipping=10,
             double_q=args.double_q,
-            param_noise=args.param_noise,
+            noisy=args.noisy,
             attack = args.attack
         )
-
         approximate_num_iters = args.num_steps / 4
         exploration = PiecewiseSchedule([
             (0, 1.0),
@@ -188,48 +176,42 @@ if __name__ == '__main__':
         steps_per_iter = RunningAvg(0.999)
         iteration_time_est = RunningAvg(0.999)
         obs = env.reset()
-        num_iters_since_reset = 0
-        reset = True
-
+        # Record the mean of the \sigma
+        sigma_name_list = []
+        sigma_list = []
+        for param in tf.trainable_variables():
+            # only record the \sigma in the action network
+            if 'sigma' in param.name and 'deepq/q_func/action_value' in param.name:
+                summary_name = param.name.replace('deepq/q_func/action_value/', '').replace('/', '.').split(':')[0]
+                sigma_name_list.append(summary_name)
+                sigma_list.append(tf.reduce_mean(tf.abs(param)))
+        f_mean_sigma = U.function(inputs=[], outputs=sigma_list)
+        # Statistics
+        writer = tf.summary.FileWriter(savedir, sess.graph)
+        im_stats = statistics(scalar_keys=['action', 'im_reward', 'td_errors', 'huber_loss']+sigma_name_list)
+        ep_stats = statistics(scalar_keys=['ep_reward', 'ep_length'])  
         # Main trianing loop
+        ep_length = 0
         while True:
             num_iters += 1
-            num_iters_since_reset += 1
+            ep_length += 1
+
+            #V: Perturb observation if we are past the init stage and at a designated attack step #
+            if craft_adv != None and (num_iters >= args.attack_init) and ((num_iters - args.attack_init) % args.attack_freq == 0) :          
+                obs = craft_adv(np.array(obs)[None])[0]
 
             # Take action and store transition in the replay buffer.
-            kwargs = {}
-            if not args.param_noise:
-                update_eps = exploration.value(num_iters)
-                update_param_noise_threshold = 0.
+            if args.noisy:
+                # greedily choose
+                action = act(np.array(obs)[None], stochastic=False)[0]
             else:
-                if args.param_noise_reset_freq > 0 and num_iters_since_reset > args.param_noise_reset_freq:
-                    # Reset param noise policy since we have exceeded the maximum number of steps without a reset.
-                    reset = True
-
-                update_eps = 0.01  # ensures that we cannot get stuck completely
-                # Compute the threshold such that the KL divergence between perturbed and non-perturbed
-                # policy is comparable to eps-greedy exploration with eps = exploration.value(t).
-                # See Appendix C.1 in Parameter Space Noise for Exploration, Plappert et al., 2017
-                # for detailed explanation.
-                update_param_noise_threshold = -np.log(1. - exploration.value(num_iters) + exploration.value(num_iters) / float(env.action_space.n))
-                kwargs['reset'] = reset
-                kwargs['update_param_noise_threshold'] = update_param_noise_threshold
-                kwargs['update_param_noise_scale'] = (num_iters % args.param_noise_update_freq == 0)
-
-
-            if craft_adv != None and (num_iters >= args.attack_init) and ((num_iters - args.attack_init) % args.attack_freq == 0) :          
-                adv_obs = craft_adv(np.array(obs)[None])[0]
-                action = act(np.array(adv_obs)[None], update_eps=update_eps, **kwargs)[0]
-            else:
-                action = act(np.array(obs)[None], update_eps=update_eps, **kwargs)[0]
-            reset = False
+                # epsilon greedy
+                action = act(np.array(obs)[None], update_eps=exploration.value(num_iters))[0]
             new_obs, rew, done, info = env.step(action)
             replay_buffer.add(obs, action, rew, new_obs, float(done))
             obs = new_obs
             if done:
-                num_iters_since_reset = 0
                 obs = env.reset()
-                reset = True
 
             if (num_iters > max(5 * args.batch_size, args.replay_buffer_size // 20) and
                     num_iters % args.learning_freq == 0):
@@ -241,11 +223,15 @@ if __name__ == '__main__':
                     obses_t, actions, rewards, obses_tp1, dones = replay_buffer.sample(args.batch_size)
                     weights = np.ones_like(rewards)
                 # Minimize the error in Bellman's equation and compute TD-error
-                td_errors = train(obses_t, actions, rewards, obses_tp1, dones, weights)
+                td_errors, huber_loss = train(obses_t, actions, rewards, obses_tp1, dones, weights)
                 # Update the priorities in the replay buffer
                 if args.prioritized:
                     new_priorities = np.abs(td_errors) + args.prioritized_eps
                     replay_buffer.update_priorities(batch_idxes, new_priorities)
+                # Write summary
+                mean_sigma = f_mean_sigma()
+                im_stats.add_all_summary(writer, [action, rew, np.mean(td_errors), np.mean(huber_loss)]+mean_sigma, num_iters)
+
             # Update target network.
             if num_iters % args.target_update_freq == 0:
                 update_target()
@@ -257,11 +243,10 @@ if __name__ == '__main__':
 
             # Save the model and training state.
             if num_iters > 0 and (num_iters % args.save_freq == 0 or info["steps"] > args.num_steps):
-                logger.log("Saving...")
                 maybe_save_model(savedir, container, {
                     'replay_buffer': replay_buffer,
                     'num_iters': num_iters,
-                    'monitor_state': monitored_env.get_state(),
+                    'monitor_state': monitored_env.get_state()
                 })
 
             if info["steps"] > args.num_steps:
@@ -270,13 +255,14 @@ if __name__ == '__main__':
             if done:
                 steps_left = args.num_steps - info["steps"]
                 completion = np.round(info["steps"] / args.num_steps, 1)
-
+                mean_ep_reward = np.mean(info["rewards"][-100:])
                 logger.record_tabular("% completion", completion)
                 logger.record_tabular("steps", info["steps"])
                 logger.record_tabular("iters", num_iters)
                 logger.record_tabular("episodes", len(info["rewards"]))
                 logger.record_tabular("reward (100 epi mean)", np.mean(info["rewards"][-100:]))
-                logger.record_tabular("exploration", exploration.value(num_iters))
+                if not args.noisy:
+                    logger.record_tabular("exploration", exploration.value(num_iters))
                 if args.prioritized:
                     logger.record_tabular("max priority", replay_buffer._max_priority)
                 fps_estimate = (float(steps_per_iter) / (float(iteration_time_est) + 1e-6)
@@ -285,3 +271,6 @@ if __name__ == '__main__':
                 logger.log()
                 logger.log("ETA: " + pretty_eta(int(steps_left / fps_estimate)))
                 logger.log()
+                # add summary for one episode
+                ep_stats.add_all_summary(writer, [mean_ep_reward, ep_length], num_iters)
+                ep_length = 0
