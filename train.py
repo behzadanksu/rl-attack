@@ -7,12 +7,12 @@ import tempfile
 import time
 import json
 
-import baselines.common.tf_util as U
+import rlattack.common.tf_util as U
 
-from baselines import logger
-from baselines import deepq
-from baselines.deepq.replay_buffer import ReplayBuffer, PrioritizedReplayBuffer
-from baselines.common.misc_util import (
+from rlattack import logger
+from rlattack import deepq
+from rlattack.deepq.replay_buffer import ReplayBuffer, PrioritizedReplayBuffer
+from rlattack.common.misc_util import (
     boolean_flag,
     pickle_load,
     pretty_eta,
@@ -21,11 +21,11 @@ from baselines.common.misc_util import (
     RunningAvg,
     SimpleMonitor
 )
-from baselines.common.schedules import LinearSchedule, PiecewiseSchedule
+from rlattack.common.schedules import LinearSchedule, PiecewiseSchedule
 # when updating this to non-deperecated ones, it is important to
 # copy over LazyFrames
-from baselines.common.atari_wrappers_deprecated import wrap_dqn
-from baselines.common.azure_utils import Container
+from rlattack.common.atari_wrappers_deprecated import wrap_dqn
+from rlattack.common.azure_utils import Container
 from model import model, dueling_model
 from statistics import statistics
 

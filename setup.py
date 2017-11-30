@@ -6,9 +6,9 @@ if sys.version_info.major != 3:
           "Python {}. The installation will likely fail.".format(sys.version_info.major))
 
 
-setup(name='baselines',
+setup(name='rlattack',
       packages=[package for package in find_packages()
-                if package.startswith('baselines')],
+                if package.startswith('rlattack')],
       install_requires=[
           'gym[mujoco,atari,classic_control]',
           'scipy',
@@ -21,8 +21,8 @@ setup(name='baselines',
           'progressbar2',
           'mpi4py',
       ],
-      description="OpenAI baselines: high quality implementations of reinforcement learning algorithms",
-      author="OpenAI",
-      url='https://github.com/openai/baselines',
-      author_email="gym@openai.com",
-      version="0.1.4")
+      description="RL-Attack - baselines for adversarial example attacks against DQN",
+      author="Vahid Behzadan",
+      url='https://github.com/behzadanksu/rl-attack',
+      author_email="behzadan@ksu.edu",
+      version="0.1.9")

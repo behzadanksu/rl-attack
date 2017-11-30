@@ -1,6 +1,6 @@
 import numpy as np
 
-from baselines.common.schedules import ConstantSchedule, PiecewiseSchedule
+from rlattack.common.schedules import ConstantSchedule, PiecewiseSchedule
 
 
 def test_piecewise_schedule():

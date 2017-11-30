@@ -68,7 +68,7 @@ The functions in this file can are used to create the following functions:
 
 """
 import tensorflow as tf
-import baselines.common.tf_util as U
+import rlattack.common.tf_util as U
 #V: Cleverhans imports#
 from cleverhans.attacks import FastGradientMethod, BasicIterativeMethod, CarliniWagnerL2
 from cleverhans.model import CallableModelWrapper
@@ -141,6 +141,26 @@ def build_act_enjoy (make_obs_ph, q_func, num_actions, noisy=False, scope="deepq
             return act
         else:
             return act, craft_adv_obs
+
+def build_adv(make_obs_tf, q_func, num_actions, epsilon, noisy):
+    with tf.variable_scope('deepq', reuse=tf.AUTO_REUSE):
+        obs_tf_in = U.ensure_tf_input(make_obs_tf("observation"))
+        stochastic_ph_adv = tf.placeholder(tf.bool, (), name="stochastic_adv")
+        update_eps_ph_adv = tf.placeholder(tf.float32, (), name="update_eps_adv")
+        eps = tf.get_variable("eps", (), initializer=tf.constant_initializer(0))
+        update_eps_expr_adv = eps.assign(tf.cond(update_eps_ph_adv >= 0, lambda: update_eps_ph_adv, lambda: eps))
+        print ("==========================================")
+
+        def wrapper(x):
+            return q_func(x, num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy)
+        adversary = FastGradientMethod(CallableModelWrapper(wrapper, 'probs'), sess=U.get_session())
+        adv_observations = adversary.generate(obs_tf_in.get(), eps=epsilon, clip_min=0, clip_max=1.0) * 255.0
+        craft_adv_obs = U.function(inputs=[obs_tf_in, stochastic_ph_adv, update_eps_ph_adv],
+                        outputs=adv_observations,
+                        givens={update_eps_ph_adv: -1.0, stochastic_ph_adv: True},
+                        updates=[update_eps_expr_adv])
+        return craft_adv_obs
+
 #######################
 
 def build_act(make_obs_ph, q_func, num_actions, noisy=False, scope="deepq", reuse=None):

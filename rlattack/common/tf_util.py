@@ -442,7 +442,7 @@ class _Function(object):
     def __init__(self, inputs, outputs, updates, givens, check_nan=False):
         for inpt in inputs:
             if not issubclass(type(inpt), TfInput):
-                assert len(inpt.op.inputs) == 0, "inputs should all be placeholders of baselines.common.TfInput"
+                assert len(inpt.op.inputs) == 0, "inputs should all be placeholders of rlattack.common.TfInput"
         self.inputs = inputs
         updates = updates or []
         self.update_group = tf.group(*updates)

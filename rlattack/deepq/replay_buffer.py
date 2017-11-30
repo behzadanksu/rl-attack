@@ -1,7 +1,7 @@
 import numpy as np
 import random
 
-from baselines.common.segment_tree import SumSegmentTree, MinSegmentTree
+from rlattack.common.segment_tree import SumSegmentTree, MinSegmentTree
 
 
 class ReplayBuffer(object):

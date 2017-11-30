@@ -1,6 +1,6 @@
 import numpy as np
 from multiprocessing import Process, Pipe
-from baselines.common.vec_env import VecEnv
+from rlattack.common.vec_env import VecEnv
 
 def worker(remote, env_fn_wrapper):
     env = env_fn_wrapper.x()

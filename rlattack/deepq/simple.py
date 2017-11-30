@@ -5,12 +5,12 @@ import tempfile
 import tensorflow as tf
 import zipfile
 
-import baselines.common.tf_util as U
+import rlattack.common.tf_util as U
 
-from baselines import logger
-from baselines.common.schedules import LinearSchedule
-from baselines import deepq
-from baselines.deepq.replay_buffer import ReplayBuffer, PrioritizedReplayBuffer
+from rlattack import logger
+from rlattack.common.schedules import LinearSchedule
+from rlattack import deepq
+from rlattack.deepq.replay_buffer import ReplayBuffer, PrioritizedReplayBuffer
 
 
 class ActWrapper(object):
@@ -161,7 +161,7 @@ def learn(env,
     -------
     act: ActWrapper
         Wrapper over act function. Adds ability to save it and load it.
-        See header of baselines/deepq/categorical.py for details on the act function.
+        See header of rlattack/deepq/categorical.py for details on the act function.
     """
     # Create all the functions necessary to train the model
 

@@ -77,7 +77,7 @@ register_benchmark({
     ]
 })
 # To reproduce:
-# python3 baselines/baselines/ppo2/ppo2_run_benchmark.py gce MujocoWalkers myrun_ppo2_whiteobs1_cpu8
+# python3 rlattack/rlattack/ppo2/ppo2_run_benchmark.py gce MujocoWalkers myrun_ppo2_whiteobs1_cpu8
 # (observation input filters necessary)
 
 
@@ -104,8 +104,8 @@ register_benchmark({
         ]
 })
 # To reproduce:
-# python3 baselines/baselines/ppo2/ppo2_run_benchmark.py gce Roboschool8M     myrun_ppo2_cpu8
-# python3 baselines/baselines/ppo2/ppo2_run_benchmark.py gce RoboschoolHarder myrun_ppo2_cpu32_large_samples65536
+# python3 rlattack/rlattack/ppo2/ppo2_run_benchmark.py gce Roboschool8M     myrun_ppo2_cpu8
+# python3 rlattack/rlattack/ppo2/ppo2_run_benchmark.py gce RoboschoolHarder myrun_ppo2_cpu32_large_samples65536
 # (Large network, train on 65536 samples each iteration. Also, _large is really necessary only for Harder)
 
 

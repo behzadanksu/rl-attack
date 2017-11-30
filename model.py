@@ -1,6 +1,6 @@
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
-from baselines.common.tf_util import noisy_dense
+from rlattack.common.tf_util import noisy_dense
 
 def model(img_in, num_actions, scope, noisy=False, reuse=False, concat_softmax=False):
     """As described in https://storage.googleapis.com/deepmind-data/assets/papers/DeepMindNature14236Paper.pdf"""
