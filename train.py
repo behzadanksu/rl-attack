@@ -6,6 +6,7 @@ import tensorflow as tf
 import tempfile
 import time
 import json
+import random
 
 import rlattack.common.tf_util as U
 
@@ -59,7 +60,7 @@ def parse_args():
     #V: Attack Arguments #
     parser.add_argument("--attack", type=str, default=None, help="Method to attack the model.")
     parser.add_argument("--attack-init", type=int, default=0, help="Iteration no. to begin attacks")
-    parser.add_argument("--attack-freq", type=int, default=1, help="Frequency of attacks")
+    parser.add_argument("--attack-prob", type=float, default=0.0, help="Probability of attack at each step, float in range 0 - 1.0" )
     return parser.parse_args()
 
 
@@ -197,7 +198,8 @@ if __name__ == '__main__':
             ep_length += 1
 
             #V: Perturb observation if we are past the init stage and at a designated attack step #
-            if craft_adv != None and (num_iters >= args.attack_init) and ((num_iters - args.attack_init) % args.attack_freq == 0) :          
+            #if craft_adv != None and (num_iters >= args.attack_init) and ((num_iters - args.attack_init) % args.attack_freq == 0) :          
+            if craft_adv != None and (num_iters >= args.attack_init) and (random.random() <= args.attack_prob) :          
                 obs = craft_adv(np.array(obs)[None])[0]
 
             # Take action and store transition in the replay buffer.
