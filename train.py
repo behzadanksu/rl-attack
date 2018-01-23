@@ -80,7 +80,7 @@ def maybe_save_model(savedir, container, state):
     U.save_state(os.path.join(savedir, model_dir, "saved"))
     if container is not None:
         container.put(os.path.join(savedir, model_dir), model_dir)
-    relatively_safe_pickle_dump(state, os.path.join(savedir, 'training_state.pkl.zip'), compression=True)
+    #relatively_safe_pickle_dump(state, os.path.join(savedir, 'training_state.pkl.zip'), compression=True)
     if container is not None:
         container.put(os.path.join(savedir, 'training_state.pkl.zip'), 'training_state.pkl.zip')
     relatively_safe_pickle_dump(state["monitor_state"], os.path.join(savedir, 'monitor_state.pkl'))
