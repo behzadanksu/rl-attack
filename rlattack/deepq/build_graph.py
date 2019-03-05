@@ -83,6 +83,8 @@ def build_act_enjoy (make_obs_ph, q_func, num_actions, noisy=False, scope="deepq
         eps = tf.get_variable("eps", (), initializer=tf.constant_initializer(0))
 
         q_values = q_func(observations_ph.get(), num_actions, scope="q_func", noisy=noisy)
+        q_values = q_values.get_logits(observations_ph.get())
+        #q_values = q_func(observations_ph, num_actions, scope="q_func", noisy=noisy)
         deterministic_actions = tf.argmax(q_values, axis=1)
 
         batch_size = tf.shape(observations_ph.get())[0]
@@ -151,9 +153,9 @@ def build_adv(make_obs_tf, q_func, num_actions, epsilon, noisy):
         update_eps_expr_adv = eps.assign(tf.cond(update_eps_ph_adv >= 0, lambda: update_eps_ph_adv, lambda: eps))
         print ("==========================================")
 
-        def wrapper(x):
-            return q_func(x, num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy)
-        adversary = FastGradientMethod(CallableModelWrapper(wrapper, 'probs'), sess=U.get_session())
+        #def wrapper(x):
+        #    return q_func(x, num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy)
+        adversary = FastGradientMethod(q_func(obs_tf_in.get(), num_actions, scope="q_func", reuse=True, concat_softmax=True, noisy=noisy), sess=U.get_session())
         adv_observations = adversary.generate(obs_tf_in.get(), eps=epsilon, clip_min=0, clip_max=1.0) * 255.0
         craft_adv_obs = U.function(inputs=[obs_tf_in, stochastic_ph_adv, update_eps_ph_adv],
                         outputs=adv_observations,
@@ -201,6 +203,7 @@ def build_act(make_obs_ph, q_func, num_actions, noisy=False, scope="deepq", reus
         eps = tf.get_variable("eps", (), initializer=tf.constant_initializer(0))
 
         q_values = q_func(observations_ph.get(), num_actions, scope="q_func", noisy=noisy)
+        q_values = q_values.get_logits(observations_ph.get())
         deterministic_actions = tf.argmax(q_values, axis=1)
 
         batch_size = tf.shape(observations_ph.get())[0]
@@ -281,10 +284,12 @@ def build_train(make_obs_ph, q_func, num_actions, optimizer, grad_norm_clipping=
 
         # q network evaluation
         q_t = q_func(obs_t_input.get(), num_actions, scope="q_func", noisy=noisy, reuse=True)  # reuse parameters from act
+        q_t = q_t.get_logits(obs_t_input.get())
         q_func_vars = U.scope_vars(U.absolute_scope_name("q_func"))
 
         # target q network evalution
         q_tp1 = q_func(obs_tp1_input.get(), num_actions, scope="target_q_func", noisy=noisy)
+        q_tp1 = q_tp1.get_logits(obs_tp1_input.get())
         target_q_func_vars = U.scope_vars(U.absolute_scope_name("target_q_func"))
 
         # q scores for actions which we know were selected in the given state.
@@ -293,6 +298,7 @@ def build_train(make_obs_ph, q_func, num_actions, optimizer, grad_norm_clipping=
         # compute estimate of best possible value starting from state at t + 1
         if double_q:
             q_tp1_using_online_net = q_func(obs_tp1_input.get(), num_actions, scope="q_func", noisy=noisy, reuse=True)
+            q_tp1_using_online_net = q_tp1_using_online_net.get_logits(obs_tp1_input.get())
             q_tp1_best_using_online_net = tf.arg_max(q_tp1_using_online_net, 1)
             q_tp1_best = tf.reduce_sum(q_tp1 * tf.one_hot(q_tp1_best_using_online_net, num_actions), 1)
         else:
@@ -343,9 +349,9 @@ def build_train(make_obs_ph, q_func, num_actions, optimizer, grad_norm_clipping=
 
         if attack != None:
             if attack == 'fgsm':
-                def wrapper(x):
-                    return q_func(x, num_actions, scope="target_q_func", reuse=True, concat_softmax=True, noisy=noisy)
-                adversary = FastGradientMethod(CallableModelWrapper(wrapper, 'probs'), sess=U.get_session())
+                #def wrapper(x):
+                #    return q_func(x, num_actions, scope="target_q_func", reuse=True, concat_softmax=True, noisy=noisy)
+                adversary = FastGradientMethod(q_func(obs_tp1_input.get(), num_actions, scope="target_q_func", reuse=True, concat_softmax=True, noisy=noisy), sess=U.get_session())
                 adv_observations = adversary.generate(obs_tp1_input.get(), eps=1.0/255.0,
                                                       clip_min=0, clip_max=1.0) * 255.0
             elif attack == 'iterative':

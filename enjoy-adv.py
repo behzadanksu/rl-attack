@@ -30,8 +30,9 @@ import gym
 import os
 import numpy as np
 
-from gym.monitoring import VideoRecorder
-
+#from gym.monitoring import VideoRecorder
+from gym import wrappers
+from time import time
 import rlattack.common.tf_util as U
 
 from rlattack import deepq
@@ -114,7 +115,8 @@ def parse_args():
 
 def make_env(game_name):
 	env = gym.make(game_name + "NoFrameskip-v4")
-	env = SimpleMonitor(env)
+	#env = SimpleMonitor(env)
+	env = wrappers.Monitor(env, './videos/' + str(time()) + '/')
 	env = wrap_dqn(env)
 	return env
 
@@ -123,14 +125,14 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
 	num_episodes = 0
 	num_moves = 0
 	num_transfer = 0
-	
-	video_recorder = None
-	video_recorder = VideoRecorder(
-		env, video_path, enabled=video_path is not None)
+	episode_rewards = [0.0]
+	#video_recorder = None
+	#video_recorder = VideoRecorder(
+	#	env, video_path, enabled=video_path is not None)
 	obs = env.reset()
 	while True:
 		env.unwrapped.render()
-		video_recorder.capture_frame()
+		#video_recorder.capture_frame()
 
 	#V: Attack #
 		if attack != None:
@@ -147,18 +149,22 @@ def play(env, act, craft_adv_obs, craft_adv_obs2, stochastic, video_path, attack
 			# Normal
 			action = act(np.array(obs)[None], stochastic=stochastic)[0]
 		
-		obs, rew, done, info = env.step(action)
+		obs, rew, done, _ = env.step(action)
+		episode_rewards[-1] += rew
 		if done:
 			obs = env.reset()
-			
-		if len(info["rewards"]) > num_episodes:
-			if len(info["rewards"]) == 1 and video_recorder.enabled:
+			episode_rewards.append(0.0)
+
+
+		if done:
+			#if len(info["rewards"]) == 1: #and video_recorder.enabled:
 				# save video of first episode
-				print("Saved video.")
-				video_recorder.close()
-				video_recorder.enabled = False
-			print('Reward: ' + str(info["rewards"][-1]))
-			num_episodes = len(info["rewards"])
+				#print("Saved video.")
+				#video_recorder.close()
+				#video_recorder.enabled = False
+			#mean_100ep_reward = round(np.mean(episode_rewards[-101:-1]), 1)
+			print('Reward: ' + str(episode_rewards[-2]))
+			num_episodes = len(episode_rewards)
 			print ('Episode: ' + str(num_episodes))
 			success = float((num_transfer)/num_moves) * 100.0
 			print("Percentage of successful attacks: "+str(success))

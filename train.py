@@ -54,7 +54,7 @@ def parse_args():
     parser.add_argument("--save-dir", type=str, default=None, required=True, help="directory in which training state and model should be saved.")
     parser.add_argument("--save-azure-container", type=str, default=None,
                         help="It present data will saved/loaded from Azure. Should be in format ACCOUNT_NAME:ACCOUNT_KEY:CONTAINER")
-    parser.add_argument("--save-freq", type=int, default=1e6, help="save model once every time this many iterations are completed")
+    parser.add_argument("--save-freq", type=int, default=1e5, help="save model once every time this many iterations are completed")
     boolean_flag(parser, "load-on-start", default=True, help="if true and model was previously saved then training will be resumed")
 
     #V: Attack Arguments #
@@ -133,7 +133,7 @@ if __name__ == '__main__':
 
     # V: Save arguments, configure log dump path to savedir #
     if savedir:
-        with open(os.path.join(savedir, 'args.json'), 'w') as f:
+        with open(os.path.join(savedir, 'args.json'), 'w+') as f:
             json.dump(vars(args), f)
         logger.configure(dir=savedir) # log to savedir
 

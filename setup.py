@@ -10,7 +10,7 @@ setup(name='rlattack',
       packages=[package for package in find_packages()
                 if package.startswith('rlattack')],
       install_requires=[
-          'gym[mujoco,atari,classic_control]',
+          'gym[atari,classic_control]',
           'scipy',
           'tqdm',
           'joblib',
