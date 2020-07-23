@@ -1,5 +1,5 @@
 from mpi4py import MPI
-import tensorflow as tf, rlattack.common.tf_util as U, numpy as np
+import tensorflow.compat.v1 as tf, rlattack.common.tf_util as U, numpy as np
 
 class RunningMeanStd(object):
     # https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
