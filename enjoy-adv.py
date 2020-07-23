@@ -44,7 +44,7 @@ from rlattack.common.atari_wrappers_deprecated import wrap_dqn
 #from rlattack.deepq.experiments.atari.model import model, dueling_model
 
 #V: imports#
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import cv2
 from collections import deque
 from model import model, dueling_model
