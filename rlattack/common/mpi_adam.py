@@ -1,6 +1,6 @@
 from mpi4py import MPI
 import rlattack.common.tf_util as U
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import numpy as np
 
 class MpiAdam(object):
