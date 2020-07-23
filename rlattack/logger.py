@@ -98,7 +98,7 @@ class TensorBoardOutputFormat(OutputFormat):
         self.step = 1
         prefix = 'events'
         path = osp.join(osp.abspath(dir), prefix)
-        import tensorflow as tf
+        import tensorflow.compat.v1 as tf
         from tensorflow.python import pywrap_tensorflow        
         from tensorflow.core.util import event_pb2
         from tensorflow.python.util import compat
