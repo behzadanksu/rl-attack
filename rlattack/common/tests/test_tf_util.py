@@ -1,5 +1,5 @@
 # tests for tf_util
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from rlattack.common.tf_util import (
     function,
     initialize,
