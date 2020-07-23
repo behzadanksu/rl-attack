@@ -2,7 +2,7 @@ import numpy as np
 import os
 import dill
 import tempfile
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import zipfile
 
 import rlattack.common.tf_util as U
