@@ -2,7 +2,7 @@ import argparse
 import gym
 import numpy as np
 import os
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tempfile
 import time
 import json
