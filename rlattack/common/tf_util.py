@@ -1,5 +1,5 @@
 import numpy as np
-import tensorflow as tf  # pylint: ignore-module
+import tensorflow.compat.v1 as tf  # pylint: ignore-module
 import builtins
 import functools
 import copy
